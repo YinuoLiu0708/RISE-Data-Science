@@ -1,0 +1,244 @@
+---
+title: "Jaccard Index Psychosis"
+output: html_notebook
+---
+
+
+```{r}
+
+# Read the data from the Excel file
+all_symptoms <- read.csv("Psychosis coding - Original.csv")
+positive_symptoms <- read.csv("Psychosis coding - Positive Symptoms.csv")
+negative_symptoms <- read.csv("Psychosis coding - Negative Symptoms.csv")
+general_symptoms <- read.csv("Psychosis coding - General Symptoms.csv")
+
+# List of variables to calculate Jaccard index
+variables <- c("PANSS.6", "PANSS.8", "PANSS.30", "SAPS", "CRSS","BPRS.18", "BPRS.24", "PSYRATS", "SANS", "CAINS", "MPS_SR", "NSA.16", "NSA.4")
+j_index_all <- c("PANSS.6", "PANSS.8", "PANSS.30", "SAPS", "CRSS","BPRS.18", "BPRS.24", "PSYRATS", "SANS", "CAINS", "MPS_SR", "NSA.16", "NSA.4")
+j_index_positive <- c("PANSS.6", "PANSS.8",	"PANSS.30",	"SAPS",	"CRSS",	"BPRS.18",	"BPRS.24", "PSYRATS")
+j_index_negative <- c("PANSS.6",	"PANSS.8",	"PANSS.30",	"CRSS",	"BPRS.18",	"BPRS.24",	"SANS",	"CAINS",	"MPS_SR",	"NSA.16",	"NSA.4")
+j_index_general <- c("PANSS.8",	"PANSS.30",	"CRSS",	"BPRS.18",	"BPRS.24",	"SANS")
+```
+
+```{r}
+
+# Function to calculate Jaccard index
+jaccard_index <- function(x, y) {
+  intersection <- sum(x & y)
+  union <- sum(x | y)
+  return(intersection / union)
+}
+
+# Initialize a matrix to store the Jaccard indices
+jaccard_matrix_all <- matrix(NA, nrow = length(j_index_all), ncol = length(j_index_all))
+rownames(jaccard_matrix_all) <- j_index_all
+colnames(jaccard_matrix_all) <- j_index_all
+
+jaccard_matrix_positive <- matrix(NA, nrow = length(j_index_positive), ncol = length(j_index_positive))
+rownames(jaccard_matrix_positive) <- j_index_positive
+colnames(jaccard_matrix_positive) <- j_index_positive
+
+jaccard_matrix_negative <- matrix(NA, nrow = length(j_index_negative), ncol = length(j_index_negative))
+rownames(jaccard_matrix_negative) <- j_index_negative
+colnames(jaccard_matrix_negative) <- j_index_negative
+
+jaccard_matrix_general <- matrix(NA, nrow = length(j_index_general), ncol = length(j_index_general))
+rownames(jaccard_matrix_general) <- j_index_general
+colnames(jaccard_matrix_general) <- j_index_general
+
+# Calculate the Jaccard index for each pair of variables
+for (i in 1:length(j_index_all)) {
+  for (j in i:length(j_index_all)) {
+    jaccard_matrix_all[i, j] <- jaccard_index(all_symptoms[[j_index_all[i]]], all_symptoms[[j_index_all[j]]])
+    jaccard_matrix_all[j, i] <- jaccard_matrix_all[i, j] # Matrix is symmetric
+  }
+}
+
+for (i in 1:length(j_index_positive)) {
+  for (j in i:length(j_index_positive)) {
+    jaccard_matrix_positive[i, j] <- jaccard_index(positive_symptoms[[j_index_positive[i]]], positive_symptoms[[j_index_positive[j]]])
+    jaccard_matrix_positive[j, i] <- jaccard_matrix_positive[i, j] # Matrix is symmetric
+  }
+}
+
+for (i in 1:length(j_index_negative)) {
+  for (j in i:length(j_index_negative)) {
+    jaccard_matrix_negative[i, j] <- jaccard_index(negative_symptoms[[j_index_negative[i]]], negative_symptoms[[j_index_negative[j]]])
+    jaccard_matrix_negative[j, i] <- jaccard_matrix_negative[i, j] # Matrix is symmetric
+  }
+}
+
+for (i in 1:length(j_index_general)) {
+  for (j in i:length(j_index_general)) {
+    jaccard_matrix_general[i, j] <- jaccard_index(general_symptoms[[j_index_general[i]]], general_symptoms[[j_index_general[j]]])
+    jaccard_matrix_general[j, i] <- jaccard_matrix_general[i, j] # Matrix is symmetric
+  }
+}
+
+# Print the Jaccard index matrix
+#print(jaccard_matrix)
+#write.csv(jaccard_matrix, file = "jaccard_matrix_psychosis.csv", row.names = TRUE)
+```
+
+
+```{r}
+jaccard_matrix_all
+jaccard_matrix_positive
+jaccard_matrix_negative
+jaccard_matrix_general
+```
+
+```{r}
+# Calculate the mean Jaccard similarity for filtered data
+mean_jaccard_similarity <- apply(jaccard_matrix, 1, function(x) (sum(x) - 1) / (length(x) - 1))
+
+# Print the mean Jaccard similarity
+print(mean_jaccard_similarity)
+
+# Adjust the mean_all calculation
+mean_all <- sum(mean_jaccard_similarity) / length(mean_jaccard_similarity)
+print(mean_all)
+
+```
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(GGally)
+```
+
+```{R}
+jaccard_matrix_all[upper.tri(jaccard_matrix_all, diag = TRUE)] <- NA
+melted_cor_matrix_all <- melt(jaccard_matrix_all, na.rm = TRUE)
+
+jaccard_matrix_positive[upper.tri(jaccard_matrix_positive, diag = TRUE)] <- NA
+melted_cor_matrix_positive <- melt(jaccard_matrix_positive, na.rm = TRUE)
+
+jaccard_matrix_negative[upper.tri(jaccard_matrix_negative, diag = TRUE)] <- NA
+melted_cor_matrix_negative <- melt(jaccard_matrix_negative, na.rm = TRUE)
+
+jaccard_matrix_general[upper.tri(jaccard_matrix_general, diag = TRUE)] <- NA
+melted_cor_matrix_general <- melt(jaccard_matrix_general, na.rm = TRUE)
+```
+
+```{R}
+plot <- ggplot(data = melted_cor_matrix_negative, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(
+    low = "yellow", 
+    high = "red", 
+    limits = c(0.01, 1), # Tightened range based on your observed data
+    name = "Correlation\n(Jaccard Index)"
+  ) +
+  geom_text(aes(label = round(value, 1)), color = "black", size = 4) +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1)) +
+  coord_fixed() +
+  theme(panel.background = element_rect(fill = "transparent", color = NA)) +
+  theme(plot.background = element_rect(fill = "transparent", color = NA)) + 
+  
+  labs(x="Assessment", y="Assessment")
+
+plot
+
+#Save the plot as a PNG file
+ggsave(
+  filename = "correlation_plot_psychosis_negative_symptoms.png",  # File name
+  plot = plot,                        # The plot object to save
+  width = 8, height = 6, dpi = 300,   # Dimensions and resolution
+  bg = "white"                        # Set background to white
+)
+
+```
+
+```{R}
+## Using PANSS as reference
+# Load necessary library
+# Read the data from the Excel file
+#data_PANSS <- read.csv("C:/Users/CBS004/Desktop/Psychosis Coding.xlsx", sheet = 1)
+
+# List of variables to calculate Jaccard index
+#variables <- c("PANSS-6", "PANSS-8", "PANSS", "SAPS", "CRSS","BRPS-18", "BRPS-24", "PSYRATS", "SANS", "CAINS", "MPS_SR", "NSA-16", "NSA-4")
+
+# Function to calculate Jaccard index
+
+# Initialize a data frame to store the Jaccard indices for comparison with ICD-11
+PANSS_jaccard_df <- data.frame(
+  Assessment = character(),
+  PANSS = character(),
+  Jaccard_with_PANSS = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Reference ICD-11 column
+PANSS_reference <- data[["PANSS"]]
+
+# Calculate the Jaccard index for each variable compared to ICD-11
+for (variable_name in variables) {
+  if (variable_name != "PANSS") {
+    jaccard_value <- jaccard_index(data[[variable_name]], data[["PANSS.30"]])
+    PANSS_jaccard_df <- rbind(PANSS_jaccard_df, 
+                            data.frame(
+                              Assessment = variable_name,
+                              PANSS = "PANSS",
+                              Jaccard_with_PANSS = jaccard_value
+                            ))
+  }
+}
+
+# Print the Jaccard index comparisons
+print(PANSS_jaccard_df)
+
+```
+
+```{R}
+# Melt the data (long format)
+melted_cor_matrix_PANSS <- melt(PANSS_jaccard_df, na.rm = TRUE)
+
+# Remove "Variable" column if it exists
+melted_cor_matrix_PANSS <- melted_cor_matrix_PANSS[, !(colnames(melted_cor_matrix_PANSS) %in% "Variable")]
+
+# Reorder the 'Assessment' column based on 'value' (Jaccard Index)
+melted_cor_matrix_PANSS$Assessment <- factor(
+  melted_cor_matrix_PANSS$Assessment,
+  levels = melted_cor_matrix_PANSS$Assessment[order(melted_cor_matrix_PANSS$value)]
+)
+
+# Improved Dot Plot with Sorting
+dot_plot <- ggplot(data = melted_cor_matrix_PANSS, aes(x = Assessment, y = 1, size = value, fill = value)) +
+  geom_point(shape = 21, color = "black") +  # Filled circles with black border
+  scale_size_continuous(range = c(8, 20), guide = "none") +  # Adjust dot size and remove size legend
+  scale_fill_gradient(low = "yellow", high = "red", 
+                      limits = c(0, 1), name = "Jaccard Index") +  # Color gradient
+  geom_text(aes(label = round(value, 2)), color = "black", size = 5, vjust = -2.5) +  # Move text upwards
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),  # Rotated axis text
+    axis.title.y = element_blank(),  # Remove y-axis title
+    axis.text.y = element_blank(),   # Remove y-axis text
+    axis.ticks.y = element_blank(),  # Remove y-axis ticks
+    panel.grid.major.y = element_blank(),  # Remove horizontal grid lines
+    panel.grid.major.x = element_blank(),  # Remove vertical grid lines
+    panel.grid.minor = element_blank(),    # Remove minor grid lines
+    plot.title = element_text(size = 16, face = "bold")  # Larger plot title
+  ) +
+  labs(
+    title = "Jaccard Index Correlation with PANSS_30",
+    x = "Assessment"
+  )
+
+# Display the updated plot
+print(dot_plot)
+
+# Save the sorted plot
+ggsave(
+  filename = "dot_plot_PANSS_sorted.png",
+  plot = dot_plot,
+  width = 8, height = 6, dpi = 300,
+  bg = "white"
+)
+
+
+```
+
